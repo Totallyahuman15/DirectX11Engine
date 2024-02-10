@@ -18,6 +18,3 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	}
 	return 0;
 }
-
-// Captn' crunch: Oops, all commits!
-// idek bruh :sob:
