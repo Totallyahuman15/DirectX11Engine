@@ -158,11 +158,14 @@
     <ClInclude Include="WindowContainer.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="pixelshader.hlsl">
+    <FxCompile Include="Graphics\pixelshader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <DisableOptimizations Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</DisableOptimizations>
+      <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</EnableDebuggingInformation>
+      <SuppressStartupBanner Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</SuppressStartupBanner>
     </FxCompile>
-    <FxCompile Include="vertexshader.hlsl">
+    <FxCompile Include="Graphics\vertexshader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
     </FxCompile>

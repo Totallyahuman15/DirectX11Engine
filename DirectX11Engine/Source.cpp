@@ -6,7 +6,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ int nCmdShow)
 {
 	Engine engine;
-	engine.Initialize(hInstance, "Title", "MyWindowClass", 800, 600);
+	if (!engine.Initialize(hInstance, "Title", "MyWindowClass", 800, 600))
+	{
+		ErrorLogger::Log("Engine failed to initialize.");
+		exit(-1);
+	}
 	while (engine.ProcessMessages() == true)
 	{
 		engine.Update();

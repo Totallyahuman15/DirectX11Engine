@@ -8,7 +8,7 @@ bool Engine::Initialize(HINSTANCE hInstance, std::string windowTitle, std::strin
 	}
 	else if (!gfx.Initialize(this->renderWindow.GetHWND(), width, height))
 	{
-		return true;
+		return false;
 	}
 
 	return true;
