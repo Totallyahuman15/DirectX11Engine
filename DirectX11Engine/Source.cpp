@@ -13,10 +13,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return -1;
 	}
 	Engine engine;
-	if (!engine.Initialize(hInstance, "Title", "MyWindowClass", 800, 600))
+	if (!engine.Initialize(hInstance, "DirectX 11 Engine [BETA]", "directx11engine", 800, 600))
 	{
 		ErrorLogger::Log("Engine failed to initialize.");
-		exit(-1);
+		return -1;
 	}
 	while (engine.ProcessMessages() == true)
 	{
