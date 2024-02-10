@@ -32,23 +32,22 @@ void Graphics::RenderFrame()
 
 	this->deviceContext->OMSetDepthStencilState(this->depthStencilState.Get(), 0);
 
+	this->deviceContext->PSSetSamplers(0, 1, this->samplerState.GetAddressOf());
+
 	this->deviceContext->VSSetShader(vertexShader.GetShader(), NULL, 0);
 	this->deviceContext->PSSetShader(pixelshader.GetShader(), NULL, 0);
 
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 
-	// Green Tri
-	this->deviceContext->IASetVertexBuffers(0, 1, vertexBuffer2.GetAddressOf(), &stride, &offset);
-	this->deviceContext->Draw(3, 0);
-
-	// Red Tri
+	// Square
+	this->deviceContext->PSSetShaderResources(0, 1, this->myTexture.GetAddressOf());
 	this->deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
-	this->deviceContext->Draw(3, 0);
+	this->deviceContext->Draw(6, 0);
 
 	// Draw Text
 	spriteBatch->Begin();
-	spriteFont->DrawString(spriteBatch.get(), L"HELLO WORLD", DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
+	spriteFont->DrawString(spriteBatch.get(), L"Hehe... cat :3", DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
 	spriteBatch->End();
 
 	this->swapChain->Present(1, NULL);
@@ -190,6 +189,22 @@ bool Graphics::InitializeDirectX(HWND hWnd, int width, int height)
 	spriteBatch = std::make_unique<DirectX::SpriteBatch>(this->deviceContext.Get());
 	spriteFont = std::make_unique<DirectX::SpriteFont>(this->device.Get(), L"Data\\Fonts\\comic_sans_ms_16.spritefont");
 
+	D3D11_SAMPLER_DESC sampDesc;
+	ZeroMemory(&sampDesc, sizeof(sampDesc));
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	hr = this->device->CreateSamplerState(&sampDesc, this->samplerState.GetAddressOf());
+	if (FAILED(hr))
+	{
+		ErrorLogger::Log(hr, "Failed to create sampler state");
+		return false;
+	}
+
 	return true;
 }
 
@@ -199,7 +214,7 @@ bool Graphics::InitializeShaders()
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
 	UINT numElements = ARRAYSIZE(layout);
@@ -219,12 +234,16 @@ bool Graphics::InitializeShaders()
 
 bool Graphics::InitializeScene()
 {
-	// Red Triangle
+	// Textured Square
 	Vertex v[] =
 	{
-		Vertex(0.0f, 0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Center Point
-		Vertex(0.5f, -0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Right Point
-		Vertex(-0.5f, -0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Left Point
+		Vertex(-0.5f, -0.5f, 1.0f, 0.0f, 1.0f), // Bottom Left
+		Vertex(-0.5, 0.5f, 1.0f, 0.0f, 0.0f), // Top Left
+		Vertex(0.5f, 0.5f, 1.0f, 1.0f, 0.0f), // Top Right
+
+		Vertex(0.5f, -0.5f, 1.0f, 1.0f, 1.0f), // Bottom Left
+		Vertex(-0.5f, -0.5f, 1.0f, 0.0f, 1.0f), // Top Right
+		Vertex(0.5f, 0.5f, 1.0f, 1.0f, 0.0f), // Bottom Right
 	};
 
 	D3D11_BUFFER_DESC vertexBufferDesc;
@@ -248,29 +267,10 @@ bool Graphics::InitializeScene()
 		return false;
 	}
 
-	// Triangle 2
-	Vertex v2[] =
-	{
-		Vertex(0.0f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Center Point
-		Vertex(0.25f, -0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Right Point
-		Vertex(-0.25f, -0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Left Point
-	};
-
-	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
-
-	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	vertexBufferDesc.ByteWidth = sizeof(Vertex) * ARRAYSIZE(v2);
-	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vertexBufferDesc.CPUAccessFlags = 0;
-	vertexBufferDesc.MiscFlags = 0;
-
-	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));
-	vertexBufferData.pSysMem = v2;
-
-	hr = this->device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, this->vertexBuffer2.GetAddressOf());
+	hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\magikat.png", nullptr, myTexture.GetAddressOf());
 	if (FAILED(hr))
 	{
-		ErrorLogger::Log(hr, "Failed to create vertex buffer.");
+		ErrorLogger::Log(hr, "Failed to create wic texture from file.");
 		return false;
 	}
 
