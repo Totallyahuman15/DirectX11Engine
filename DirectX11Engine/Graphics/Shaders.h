@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma comment(lib, "D3DCompiler.lib")
+
 #include "../ErrorLogger.h"
 #include <d3dcompiler.h>
 #include <d3d11.h>

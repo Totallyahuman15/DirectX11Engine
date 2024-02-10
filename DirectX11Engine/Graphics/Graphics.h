@@ -3,6 +3,9 @@
 #include "AdapterReader.h"
 #include "Shaders.h"
 #include "Vertex.h"
+#include <SpriteBatch.h>
+#include <SpriteFont.h>
+#include <memory>
 
 class Graphics
 {
@@ -27,6 +30,10 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthStencilView;
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthStencilBuffer;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthStencilState;
 
 	Microsoft::WRL::ComPtr<ID3D11RasterizerState> resterizerState;
+
+	std::unique_ptr<DirectX::SpriteBatch> spriteBatch = nullptr;
+	std::unique_ptr<DirectX::SpriteFont> spriteFont = nullptr;
 };

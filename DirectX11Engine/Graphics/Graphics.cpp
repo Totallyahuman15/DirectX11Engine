@@ -24,10 +24,13 @@ void Graphics::RenderFrame()
 {
 	float bgcolor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	this->deviceContext->ClearRenderTargetView(this->renderTargetView.Get(), bgcolor);
+	this->deviceContext->ClearDepthStencilView(this->depthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	this->deviceContext->IASetInputLayout(this->vertexShader.GetInputLayout());
 	this->deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	this->deviceContext->RSSetState(this->resterizerState.Get());
+
+	this->deviceContext->OMSetDepthStencilState(this->depthStencilState.Get(), 0);
 
 	this->deviceContext->VSSetShader(vertexShader.GetShader(), NULL, 0);
 	this->deviceContext->PSSetShader(pixelshader.GetShader(), NULL, 0);
@@ -42,6 +45,11 @@ void Graphics::RenderFrame()
 	// Red Tri
 	this->deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
 	this->deviceContext->Draw(3, 0);
+
+	// Draw Text
+	spriteBatch->Begin();
+	spriteFont->DrawString(spriteBatch.get(), L"HELLO WORLD", DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
+	spriteBatch->End();
 
 	this->swapChain->Present(1, NULL);
 }
@@ -112,7 +120,7 @@ bool Graphics::InitializeDirectX(HWND hWnd, int width, int height)
 		return false;
 	}
 
-	D3D11_TEXTURE2D_DESC dsd;
+	D3D11_TEXTURE2D_DESC dsd = {};
 	dsd.Width = width;
 	dsd.Height = height;
 	dsd.MipLevels = 1;
@@ -125,7 +133,35 @@ bool Graphics::InitializeDirectX(HWND hWnd, int width, int height)
 	dsd.CPUAccessFlags = 0;
 	dsd.MiscFlags = 0;
 
-	this->deviceContext->OMSetRenderTargets(1, this->renderTargetView.GetAddressOf(), NULL);
+	hr = this->device->CreateTexture2D(&dsd, NULL, this->depthStencilBuffer.GetAddressOf());
+	if (FAILED(hr))
+	{
+		ErrorLogger::Log(hr, "Failed to create depth stencil buffer.");
+		return false;
+	}
+
+	hr = this->device->CreateDepthStencilView(this->depthStencilBuffer.Get(), NULL, this->depthStencilView.GetAddressOf());
+	if (FAILED(hr))
+	{
+		ErrorLogger::Log(hr, "Failed to create depth stencil view.");
+		return false;
+	}
+
+	this->deviceContext->OMSetRenderTargets(1, this->renderTargetView.GetAddressOf(), this->depthStencilView.Get());
+
+	D3D11_DEPTH_STENCIL_DESC depthStencilDesc;
+	ZeroMemory(&depthStencilDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+	hr = this->device->CreateDepthStencilState(&depthStencilDesc, this->depthStencilState.GetAddressOf());
+	if (FAILED(hr))
+	{
+		ErrorLogger::Log(hr, "Failed to create depth stencil state.");
+		return false;
+	}
 
 	D3D11_VIEWPORT viewport;
 	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
@@ -151,6 +187,9 @@ bool Graphics::InitializeDirectX(HWND hWnd, int width, int height)
 		return false;
 	}
 
+	spriteBatch = std::make_unique<DirectX::SpriteBatch>(this->deviceContext.Get());
+	spriteFont = std::make_unique<DirectX::SpriteFont>(this->device.Get(), L"Data\\Fonts\\comic_sans_ms_16.spritefont");
+
 	return true;
 }
 
@@ -159,7 +198,7 @@ bool Graphics::InitializeShaders()
 
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
-		{"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
@@ -180,11 +219,12 @@ bool Graphics::InitializeShaders()
 
 bool Graphics::InitializeScene()
 {
+	// Red Triangle
 	Vertex v[] =
 	{
-		Vertex(0.0f, 0.5f, 1.0f, 0.0f, 0.0f), // Center Point
-		Vertex(0.5f, -0.5f, 1.0f, 0.0f, 0.0f), // Right Point
-		Vertex(-0.5f, -0.5f, 1.0f, 0.0f, 0.0f), // Left Point
+		Vertex(0.0f, 0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Center Point
+		Vertex(0.5f, -0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Right Point
+		Vertex(-0.5f, -0.5f, 1.0f, 1.0f, 0.0f, 0.0f), // Left Point
 	};
 
 	D3D11_BUFFER_DESC vertexBufferDesc;
@@ -211,9 +251,9 @@ bool Graphics::InitializeScene()
 	// Triangle 2
 	Vertex v2[] =
 	{
-		Vertex(0.0f, 0.25f, 0.0f, 1.0f, 0.0f), // Center Point
-		Vertex(0.25f, -0.25f, 0.0f, 1.0f, 0.0f), // Right Point
-		Vertex(-0.25f, -0.25f, 0.0f, 1.0f, 0.0f), // Left Point
+		Vertex(0.0f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Center Point
+		Vertex(0.25f, -0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Right Point
+		Vertex(-0.25f, -0.25f, 0.0f, 0.0f, 1.0f, 0.0f), // Left Point
 	};
 
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
