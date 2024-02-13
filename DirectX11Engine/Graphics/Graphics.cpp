@@ -20,22 +20,6 @@ bool Graphics::Initialize(HWND hWnd, int width, int height)
 	return true;
 }
 
-float Bounce(float yOff)
-{
-	static float additionFactor = -0.01f;
-
-	if (yOff <= -0.5f)
-	{
-		additionFactor = 0.01f;
-	}
-	else if (yOff >= 0.5f)
-	{
-		additionFactor = -0.01f;
-	}
-
-	return yOff + additionFactor;
-}
-
 void Graphics::RenderFrame()
 {
 	float bgcolor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -55,11 +39,8 @@ void Graphics::RenderFrame()
 
 	UINT offset = 0;
 
-	static float yOff = 0.5f;
-	yOff = Bounce(yOff);
-
-	constantBuffer.data.xOffset = 0.0f;
-	constantBuffer.data.yOffset = yOff;
+	constantBuffer.data.mat = DirectX::XMMatrixScaling(0.5f, 0.5f, 1.0f) * DirectX::XMMatrixScaling(0.5f, 0.5f, 1.0f);
+	constantBuffer.data.mat = DirectX::XMMatrixTranspose(constantBuffer.data.mat);
 	if (!constantBuffer.ApplyChanges())
 	{
 		return;
