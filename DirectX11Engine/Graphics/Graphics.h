@@ -10,6 +10,7 @@
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
 #include "ConstantBufferTypes.h"
+#include "ConstantBuffer.h"
 
 class Graphics
 {
@@ -28,7 +29,7 @@ private:
 
 	VertexShader vertexShader;
 	PixelShader pixelshader;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
+	ConstantBuffer<CB_VS_vertexShader> constantBuffer;
 
 	VertexBuffer<Vertex> vertexBuffer;
 	IndexBuffer indicesBuffer;
