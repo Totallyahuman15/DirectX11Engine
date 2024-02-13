@@ -44,11 +44,11 @@ void Graphics::RenderFrame()
 	this->deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), vertexBuffer.GetStride(), &offset);
 	this->deviceContext->IASetIndexBuffer(indicesBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
-	this->deviceContext->DrawIndexed(6, 0, 0);
+	this->deviceContext->DrawIndexed(indicesBuffer.BufferSize(), 0, 0);
 
 	// Draw Text
 	spriteBatch->Begin();
-	spriteFont->DrawString(spriteBatch.get(), L"Hehe... cat :3", DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
+	spriteFont->DrawString(spriteBatch.get(), L"Thinking about mass destruction:", DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
 	spriteBatch->End();
 
 	this->swapChain->Present(1, NULL);
@@ -244,32 +244,21 @@ bool Graphics::InitializeScene()
 		Vertex(0.5f, -0.5f, 1.0f, 1.0f, 1.0f), // Bottom Right - [3]
 	};
 
+	HRESULT hr;
+	hr = this->vertexBuffer.Initialize(this->device.Get(), v, ARRAYSIZE(v));
+	if (FAILED(hr))
+	{
+		ErrorLogger::Log(hr, "Failed to create vertex buffer.");
+		return false;
+	}
+
 	DWORD indices[] =
 	{
 		0, 1, 2,
 		0, 3, 2
 	};
 
-	HRESULT hr;
-	hr = this->vertexBuffer.Initialize(this->device.Get(), v, ARRAYSIZE(v));
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to initialize vertex buffer.");
-		return false;
-	}
-
-	// Load index data
-	D3D11_BUFFER_DESC indexBufferDesc;
-	ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
-	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	indexBufferDesc.ByteWidth = sizeof(DWORD) * ARRAYSIZE(indices);
-	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	indexBufferDesc.CPUAccessFlags = 0;
-	indexBufferDesc.MiscFlags = 0;
-
-	D3D11_SUBRESOURCE_DATA indexBufferData;
-	indexBufferData.pSysMem = indices;
-	hr = device->CreateBuffer(&indexBufferDesc, &indexBufferData, indicesBuffer.GetAddressOf());
+	hr = this->indicesBuffer.Initialize(this->device.Get(), indices, ARRAYSIZE(indices));
 	if (FAILED(hr))
 	{
 		ErrorLogger::Log(hr, "Failed to create indices buffer.");
@@ -277,7 +266,7 @@ bool Graphics::InitializeScene()
 	}
 
 	// Load texture data
-	hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\magikat.png", nullptr, myTexture.GetAddressOf());
+	hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\chaoscat.png", nullptr, myTexture.GetAddressOf());
 	if (FAILED(hr))
 	{
 		ErrorLogger::Log(hr, "Failed to create wic texture from file.");
