@@ -1,3 +1,8 @@
+cbuffer alphaBuffer : register(b0)
+{
+    float alpha;
+}
+
 struct PS_INPUT
 {
     float4 pos : SV_POSITION;
