@@ -40,9 +40,10 @@ void Graphics::RenderFrame()
 
 	this->deviceContext->IASetInputLayout(this->vertexShader.GetInputLayout());
 	this->deviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	this->deviceContext->RSSetState(this->resterizerState.Get());
+	this->deviceContext->RSSetState(this->rasterizerState.Get());
 
 	this->deviceContext->OMSetDepthStencilState(this->depthStencilState.Get(), 0);
+	this->deviceContext->OMSetBlendState(NULL, NULL, 0xFFFFFFFF);
 
 	this->deviceContext->PSSetSamplers(0, 1, this->samplerState.GetAddressOf());
 
@@ -51,28 +52,11 @@ void Graphics::RenderFrame()
 
 	UINT offset = 0;
 
-	// Update constant buffer(s)
-	static float translationOffset[3] = { 0, 0, 0 };
-	DirectX::XMMATRIX world = XMMatrixTranslation(translationOffset[0], translationOffset[1], translationOffset[2]);
+	static float ImGuiValue_worldOffset[3] = { 0.0f, 0.0f, 0.0f };
 
-	cb_vs_vertexshader.data.mat = world * camera.GetViewMatrix() * camera.GetProjectionMatrix();
-	cb_vs_vertexshader.data.mat = DirectX::XMMatrixTranspose(cb_vs_vertexshader.data.mat);
-	if (!cb_vs_vertexshader.ApplyChanges())
-	{
-		return;
+	{ // Pavement
+		this->model.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix());
 	}
-	this->deviceContext->VSSetConstantBuffers(0, 1, this->cb_vs_vertexshader.GetAddressOf());
-
-	this->cb_ps_pixelshader.data.alpha = 1.0f;
-	this->cb_ps_pixelshader.ApplyChanges();
-	this->deviceContext->PSSetConstantBuffers(0, 1, this->cb_ps_pixelshader.GetAddressOf());
-
-	// Square
-	this->deviceContext->PSSetShaderResources(0, 1, this->myTexture.GetAddressOf());
-	this->deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), vertexBuffer.GetStride(), &offset);
-	this->deviceContext->IASetIndexBuffer(indicesBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-
-	this->deviceContext->DrawIndexed(indicesBuffer.BufferSize(), 0, 0);
 
 	// Draw Text
 	static int fpsCounter = 0;
@@ -93,7 +77,7 @@ void Graphics::RenderFrame()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Begin("Test");
-	ImGui::DragFloat3("Translation X/Y/Z", translationOffset, 0.1f, -5.0f, 5.0f);
+	ImGui::DragFloat3("Translation X/Y/Z", ImGuiValue_worldOffset, 0.1f, -999.0f, 999.0f);
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -103,157 +87,158 @@ void Graphics::RenderFrame()
 
 bool Graphics::InitializeDirectX(HWND hWnd)
 {
-	std::vector<AdapterData> adapters = AdapterReader::GetAdapters();
+	try {
+		std::vector<AdapterData> adapters = AdapterReader::GetAdapters();
 
-	if (adapters.size() < 1)
-	{
-		ErrorLogger::Log("No IDXGI Adapters found.");
-		return false;
-	}
+		if (adapters.size() < 1)
+		{
+			ErrorLogger::Log("No IDXGI Adapters found.");
+			return false;
+		}
 
-	DXGI_SWAP_CHAIN_DESC scd;
-	ZeroMemory(&scd, sizeof(DXGI_SWAP_CHAIN_DESC));
+		DXGI_SWAP_CHAIN_DESC scd;
+		ZeroMemory(&scd, sizeof(DXGI_SWAP_CHAIN_DESC));
 
-	scd.BufferDesc.Width = this->windowWidth;
-	scd.BufferDesc.Height = this->windowHeight;
-	scd.BufferDesc.RefreshRate.Numerator = 60;
-	scd.BufferDesc.RefreshRate.Denominator = 1;
-	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	scd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-	scd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+		scd.BufferDesc.Width = this->windowWidth;
+		scd.BufferDesc.Height = this->windowHeight;
+		scd.BufferDesc.RefreshRate.Numerator = 60;
+		scd.BufferDesc.RefreshRate.Denominator = 1;
+		scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		scd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+		scd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 
-	scd.SampleDesc.Count = 1;
-	scd.SampleDesc.Quality = 0;
+		scd.SampleDesc.Count = 1;
+		scd.SampleDesc.Quality = 0;
 
-	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	scd.BufferCount = 1;
-	scd.OutputWindow = hWnd;
-	scd.Windowed = TRUE;
-	scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-	scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+		scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		scd.BufferCount = 1;
+		scd.OutputWindow = hWnd;
+		scd.Windowed = TRUE;
+		scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+		scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-	HRESULT hr;
-	hr = D3D11CreateDeviceAndSwapChain(adapters[0].pAdapter.Get(),
-		D3D_DRIVER_TYPE_UNKNOWN,
-		NULL,
-		NULL,
-		NULL,
-		0,
-		D3D11_SDK_VERSION,
-		&scd,
-		this->swapChain.GetAddressOf(),
-		this->device.GetAddressOf(),
-		NULL,
-		this->deviceContext.GetAddressOf()
+		HRESULT hr;
+		hr = D3D11CreateDeviceAndSwapChain(adapters[0].pAdapter.Get(),
+			D3D_DRIVER_TYPE_UNKNOWN,
+			NULL,
+			NULL,
+			NULL,
+			0,
+			D3D11_SDK_VERSION,
+			&scd,
+			this->swapChain.GetAddressOf(),
+			this->device.GetAddressOf(),
+			NULL,
+			this->deviceContext.GetAddressOf()
 		);
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create device and swapchain.");
-		return false;
+		COM_ERROR_IF_FAILED(hr, "Failed to create device and swapchain.");
+
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+		hr = this->swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
+		COM_ERROR_IF_FAILED(hr, "GetBuffer Failed.");
+
+		hr = this->device->CreateRenderTargetView(backBuffer.Get(), NULL, this->renderTargetView.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create render target view.");
+
+		D3D11_TEXTURE2D_DESC dsd = {};
+		dsd.Width = this->windowWidth;
+		dsd.Height = this->windowHeight;
+		dsd.MipLevels = 1;
+		dsd.ArraySize = 1;
+		dsd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		dsd.SampleDesc.Count = 1;
+		dsd.SampleDesc.Quality = 0;
+		dsd.Usage = D3D11_USAGE_DEFAULT;
+		dsd.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+		dsd.CPUAccessFlags = 0;
+		dsd.MiscFlags = 0;
+
+		hr = this->device->CreateTexture2D(&dsd, NULL, this->depthStencilBuffer.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create depth stencil buffer.");
+
+		hr = this->device->CreateDepthStencilView(this->depthStencilBuffer.Get(), NULL, this->depthStencilView.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create depth stencil view.");
+
+		this->deviceContext->OMSetRenderTargets(1, this->renderTargetView.GetAddressOf(), this->depthStencilView.Get());
+
+		D3D11_DEPTH_STENCIL_DESC depthStencilDesc;
+		ZeroMemory(&depthStencilDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+		depthStencilDesc.DepthEnable = true;
+		depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+		hr = this->device->CreateDepthStencilState(&depthStencilDesc, this->depthStencilState.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create depth stencil state.");
+
+		D3D11_VIEWPORT viewport;
+		ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
+
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = this->windowWidth;
+		viewport.Height = this->windowHeight;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+
+		this->deviceContext->RSSetViewports(1, &viewport);
+
+		// Create rasterizer states
+		D3D11_RASTERIZER_DESC rasterizerDesc;
+		ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+		rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+		rasterizerDesc.CullMode = D3D11_CULL_BACK;
+		hr = this->device->CreateRasterizerState(&rasterizerDesc, this->rasterizerState.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create rasterizer state.");
+
+		D3D11_RASTERIZER_DESC rasterizerDescCullFront;
+		ZeroMemory(&rasterizerDescCullFront, sizeof(D3D11_RASTERIZER_DESC));
+
+		rasterizerDescCullFront.FillMode = D3D11_FILL_SOLID;
+		rasterizerDescCullFront.CullMode = D3D11_CULL_FRONT;
+		hr = this->device->CreateRasterizerState(&rasterizerDescCullFront, this->rasterizerStateCullFront.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create rasterizer state.");
+
+		// Create blend space
+		D3D11_BLEND_DESC blendDesc;
+		ZeroMemory(&blendDesc, sizeof(blendDesc));
+
+		D3D11_RENDER_TARGET_BLEND_DESC rtbd;
+		ZeroMemory(&rtbd, sizeof(rtbd));
+
+		rtbd.BlendEnable = true;
+		rtbd.SrcBlend = D3D11_BLEND::D3D11_BLEND_SRC_ALPHA;
+		rtbd.DestBlend = D3D11_BLEND::D3D11_BLEND_INV_SRC_ALPHA;
+		rtbd.BlendOp = D3D11_BLEND_OP::D3D11_BLEND_OP_ADD;
+		rtbd.SrcBlendAlpha = D3D11_BLEND::D3D11_BLEND_ONE;
+		rtbd.DestBlendAlpha = D3D11_BLEND::D3D11_BLEND_ZERO;
+		rtbd.BlendOpAlpha = D3D11_BLEND_OP::D3D11_BLEND_OP_ADD;
+		rtbd.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE::D3D11_COLOR_WRITE_ENABLE_ALL;
+
+		blendDesc.RenderTarget[0] = rtbd;
+
+		hr = this->device->CreateBlendState(&blendDesc, this->blendState.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create blend state.");
+
+		spriteBatch = std::make_unique<DirectX::SpriteBatch>(this->deviceContext.Get());
+		spriteFont = std::make_unique<DirectX::SpriteFont>(this->device.Get(), L"Data\\Fonts\\comic_sans_ms_16.spritefont");
+
+		D3D11_SAMPLER_DESC sampDesc;
+		ZeroMemory(&sampDesc, sizeof(sampDesc));
+		sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+		sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+		sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+		sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+		sampDesc.MinLOD = 0;
+		sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+		hr = this->device->CreateSamplerState(&sampDesc, this->samplerState.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create sampler state");
 	}
-
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-	hr = this->swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
-	if (FAILED(hr))
+	catch (COMException& exception)
 	{
-		ErrorLogger::Log(hr, "GetBuffer Failed.");
-		return false;
-	}
-
-	hr = this->device->CreateRenderTargetView(backBuffer.Get(), NULL, this->renderTargetView.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create render target view.");
-		return false;
-	}
-
-	D3D11_TEXTURE2D_DESC dsd = {};
-	dsd.Width = this->windowWidth;
-	dsd.Height = this->windowHeight;
-	dsd.MipLevels = 1;
-	dsd.ArraySize = 1;
-	dsd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	dsd.SampleDesc.Count = 1;
-	dsd.SampleDesc.Quality = 0;
-	dsd.Usage = D3D11_USAGE_DEFAULT;
-	dsd.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	dsd.CPUAccessFlags = 0;
-	dsd.MiscFlags = 0;
-
-	hr = this->device->CreateTexture2D(&dsd, NULL, this->depthStencilBuffer.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create depth stencil buffer.");
-		return false;
-	}
-
-	hr = this->device->CreateDepthStencilView(this->depthStencilBuffer.Get(), NULL, this->depthStencilView.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create depth stencil view.");
-		return false;
-	}
-
-	this->deviceContext->OMSetRenderTargets(1, this->renderTargetView.GetAddressOf(), this->depthStencilView.Get());
-
-	D3D11_DEPTH_STENCIL_DESC depthStencilDesc;
-	ZeroMemory(&depthStencilDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
-
-	depthStencilDesc.DepthEnable = true;
-	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-
-	hr = this->device->CreateDepthStencilState(&depthStencilDesc, this->depthStencilState.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create depth stencil state.");
-		return false;
-	}
-
-	D3D11_VIEWPORT viewport;
-	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
-
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.Width = this->windowWidth;
-	viewport.Height = this->windowHeight;
-	viewport.MinDepth = 0.0f;
-	viewport.MaxDepth = 1.0f;
-
-	this->deviceContext->RSSetViewports(1, &viewport);
-
-	D3D11_RASTERIZER_DESC rasterizerDesc;
-	ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
-
-	rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-	rasterizerDesc.CullMode = D3D11_CULL_NONE;
-	hr = this->device->CreateRasterizerState(&rasterizerDesc, this->resterizerState.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create rasterizer state.");
-		return false;
-	}
-
-	// Create blend space
-	D3D11_BLEND_DESC blendDesc;
-	ZeroMemory(&blendDesc, sizeof(blendDesc));
-
-	spriteBatch = std::make_unique<DirectX::SpriteBatch>(this->deviceContext.Get());
-	spriteFont = std::make_unique<DirectX::SpriteFont>(this->device.Get(), L"Data\\Fonts\\comic_sans_ms_16.spritefont");
-
-	D3D11_SAMPLER_DESC sampDesc;
-	ZeroMemory(&sampDesc, sizeof(sampDesc));
-	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	sampDesc.MinLOD = 0;
-	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
-	hr = this->device->CreateSamplerState(&sampDesc, this->samplerState.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create sampler state");
+		ErrorLogger::Log(exception);
 		return false;
 	}
 
@@ -286,61 +271,39 @@ bool Graphics::InitializeShaders()
 
 bool Graphics::InitializeScene()
 {
-	// Textured Square
-	Vertex v[] =
-	{
-		Vertex(-0.5f, -0.5f, 0.0f, 0.0f, 1.0f), // Bottom Left - [0]
-		Vertex(-0.5, 0.5f, 0.0f, 0.0f, 0.0f), // Top Left - [1]
-		Vertex(0.5f, 0.5f, 0.0f, 1.0f, 0.0f), // Top Right - [2]
-		Vertex(0.5f, -0.5f, 0.0f, 1.0f, 1.0f), // Bottom Right - [3]
-	};
+	try {
+		HRESULT hr;
+		// Load texture data
+		hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\pinksquare.jpg", nullptr, pinkTexture.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create WIC texture from file.");
 
-	HRESULT hr;
-	hr = this->vertexBuffer.Initialize(this->device.Get(), v, ARRAYSIZE(v));
-	if (FAILED(hr))
+		hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\seamless_grass.jpg", nullptr, grassTexture.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create WIC texture from file.");
+
+		hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\seamless_pavement.jpg", nullptr, pavement.GetAddressOf());
+		COM_ERROR_IF_FAILED(hr, "Failed to create WIC texture from file.");
+
+		// Initialize constant buffer(s)
+		hr = this->cb_vs_vertexshader.Initialize(this->device.Get(), this->deviceContext.Get());
+		COM_ERROR_IF_FAILED(hr, "Failed to initialize constant buffer.");
+
+		hr = this->cb_ps_pixelshader.Initialize(this->device.Get(), this->deviceContext.Get());
+		COM_ERROR_IF_FAILED(hr, "Failed to initialize constant buffer.");
+
+		// Initialize model(s)
+		if (!model.Initialize(this->device.Get(), this->deviceContext.Get(), this->pavement.Get(), cb_vs_vertexshader))
+		{
+			return false;
+		}
+
+		camera.SetPosition(0.0f, 0.0f, -2.0f);
+		camera.SetProjectionValues(90.0f, static_cast<float>(windowWidth) / static_cast<float>(windowHeight), 0.1f, 1000.0f);
+	}
+	catch (COMException& exception)
 	{
-		ErrorLogger::Log(hr, "Failed to create vertex buffer.");
+		ErrorLogger::Log(exception);
 		return false;
 	}
-
-	DWORD indices[] =
-	{
-		0, 1, 2,
-		0, 3, 2
-	};
-
-	hr = this->indicesBuffer.Initialize(this->device.Get(), indices, ARRAYSIZE(indices));
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create indices buffer.");
-		return false;
-	}
-
-	// Load texture data
-	hr = DirectX::CreateWICTextureFromFile(this->device.Get(), L"Data\\Textures\\chaoscat.png", nullptr, myTexture.GetAddressOf());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to create wic texture from file.");
-		return false;
-	}
-
-	// Initialize constant buffer(s)
-	hr = this->cb_vs_vertexshader.Initialize(this->device.Get(), this->deviceContext.Get());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to initialize constant buffer.");
-		return false;
-	}
-
-	hr = this->cb_ps_pixelshader.Initialize(this->device.Get(), this->deviceContext.Get());
-	if (FAILED(hr))
-	{
-		ErrorLogger::Log(hr, "Failed to initialize constant buffer.");
-		return false;
-	}
-
-	camera.SetPosition(0.0f, 0.0f, -2.0f);
-	camera.SetProjectionValues(90.0f, static_cast<float>(windowWidth)/static_cast<float>(windowHeight), 0.1f, 1000.0f);
 
 	return true;
 }

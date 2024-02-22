@@ -12,6 +12,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		ErrorLogger::Log(hr, "Failed to call CoInitialize.");
 		return -1;
 	}
+
 	Engine engine;
 	if (!engine.Initialize(hInstance, "DirectX 11 Engine [BETA]", "directx11engine", 800, 600))
 	{
