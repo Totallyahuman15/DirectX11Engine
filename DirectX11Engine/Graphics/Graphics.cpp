@@ -52,10 +52,14 @@ void Graphics::RenderFrame()
 
 	UINT offset = 0;
 
-	static float ImGuiValue_worldOffset[3] = { 0.0f, 0.0f, 0.0f };
+	static bool renderOrange = false;
 
-	{ // Pavement
-		this->model.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix());
+	{ // Render game object(s)
+		this->gameObject.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix());
+		if (renderOrange)
+		{
+			this->orange.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix());
+		}
 	}
 
 	// Draw Text
@@ -69,7 +73,7 @@ void Graphics::RenderFrame()
 		fpsTimer.Restart();
 	}
 	spriteBatch->Begin();
-	spriteFont->DrawString(spriteBatch.get(), StringConverter::StringToWide(fpsString).c_str(), DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
+	spriteFont->DrawString(spriteBatch.get(), StringHelper::StringToWide(fpsString).c_str(), DirectX::XMFLOAT2(0, 0), DirectX::Colors::White, 0.0f, DirectX::XMFLOAT2(0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));
 	spriteBatch->End();
 
 	// Start the ImGui frame
@@ -77,7 +81,7 @@ void Graphics::RenderFrame()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Begin("Test");
-	ImGui::DragFloat3("Translation X/Y/Z", ImGuiValue_worldOffset, 0.1f, -999.0f, 999.0f);
+	ImGui::Checkbox("Render orange model?", &renderOrange);
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -291,7 +295,12 @@ bool Graphics::InitializeScene()
 		COM_ERROR_IF_FAILED(hr, "Failed to initialize constant buffer.");
 
 		// Initialize model(s)
-		if (!model.Initialize(this->device.Get(), this->deviceContext.Get(), this->pavement.Get(), cb_vs_vertexshader))
+		if (!gameObject.Initialize("Data\\Objects\\nanosuit\\nanosuit.obj", this->device.Get(), this->deviceContext.Get(), cb_vs_vertexshader))
+		{
+			return false;
+		}
+
+		if (!orange.Initialize("Data\\Objects\\Samples\\orange_disktexture.fbx", this->device.Get(), this->deviceContext.Get(), cb_vs_vertexshader))
 		{
 			return false;
 		}

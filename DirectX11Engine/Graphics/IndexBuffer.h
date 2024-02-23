@@ -27,24 +27,24 @@ public:
 		return buffer.GetAddressOf();
 	}
 
-	UINT BufferSize() const
+	UINT IndexCount() const
 	{
 		return this->bufferSize;
 	}
 
-	HRESULT Initialize(ID3D11Device* device, DWORD* data, UINT numIndices)
+	HRESULT Initialize(ID3D11Device* device, DWORD* data, UINT indexCount)
 	{
 		if (buffer.Get() != nullptr)
 		{
 			buffer.Reset();
 		}
 
-		this->bufferSize = numIndices;
+		this->bufferSize = indexCount;
 
 		D3D11_BUFFER_DESC indexBufferDesc;
 		ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
 		indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		indexBufferDesc.ByteWidth = sizeof(DWORD) * numIndices;
+		indexBufferDesc.ByteWidth = sizeof(DWORD) * indexCount;
 		indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 		indexBufferDesc.CPUAccessFlags = 0;
 		indexBufferDesc.MiscFlags = 0;

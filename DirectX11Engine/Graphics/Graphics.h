@@ -11,7 +11,7 @@
 #include "ImGui\\imgui.h"
 #include "ImGui\\imgui_impl_dx11.h"
 #include "ImGui\\imgui_impl_win32.h"
-#include "Model.h"
+#include "GameObject.h"
 
 class Graphics
 {
@@ -19,7 +19,8 @@ public:
 	bool Initialize(HWND hWnd, int width, int height);
 	void RenderFrame();
 	Camera camera;
-	Model model;
+	GameObject gameObject;
+	GameObject orange;
 private:
 	bool InitializeDirectX(HWND hWnd);
 	bool InitializeShaders();
